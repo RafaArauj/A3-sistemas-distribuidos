@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -22,9 +23,9 @@ type RespostaServidor1 struct {
 }
 
 type RespostaServidor2 struct {
-	Operacao  string `json:"operacao"`
+	Operacao   string `json:"operacao"`
 	Maiusculas string `json:"maiusculas"`
-	Invertido string `json:"invertido"`
+	Invertido  string `json:"invertido"`
 }
 
 func consultarServidor1(dados []byte, wg *sync.WaitGroup) {
@@ -99,36 +100,43 @@ func consultarServidor2(dados []byte, wg *sync.WaitGroup) {
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Print("Digite um texto: ")
+	for {
+		fmt.Print("Digite um texto: ")
 
-	texto, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Erro ao ler o texto:", err)
-		return
+		texto, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("\nEncerrando cliente", err)
+			return
+		}
+
+		if strings.TrimSpace(texto) == "" {
+			fmt.Println("Texto vazio, digite algo.")
+			continue
+		}
+
+		requisicao := Requisicao{
+			Operacao: "processar_texto",
+			Texto:    texto,
+		}
+
+		dados, err := json.Marshal(requisicao)
+		if err != nil {
+			fmt.Println("Erro ao criar JSON:", err)
+			return
+		}
+
+		fmt.Println("\nJSON enviado:")
+		fmt.Println(string(dados))
+
+		var wg sync.WaitGroup
+
+		wg.Add(2)
+
+		go consultarServidor1(dados, &wg)
+		go consultarServidor2(dados, &wg)
+
+		wg.Wait()
+
+		fmt.Println("\nProcessamento concluído!")
 	}
-
-	requisicao := Requisicao{
-		Operacao: "processar_texto",
-		Texto:    texto,
-	}
-
-	dados, err := json.Marshal(requisicao)
-	if err != nil {
-		fmt.Println("Erro ao criar JSON:", err)
-		return
-	}
-
-	fmt.Println("\nJSON enviado:")
-	fmt.Println(string(dados))
-
-	var wg sync.WaitGroup
-
-	wg.Add(2)
-
-	go consultarServidor1(dados, &wg)
-	go consultarServidor2(dados, &wg)
-
-	wg.Wait()
-
-	fmt.Println("\nProcessamento concluído!")
 }
